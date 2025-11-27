@@ -37,8 +37,8 @@ const SUSPICIOUS_THRESHOLD = 10;
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
 const MAX_BODY_SIZE = 50 * 1024 * 1024;
-const ALLOWED_COUNTRIES = ['IR'];
-const BLOCKED_COUNTRIES = [];
+const ALLOWED_COUNTRIES = ['ZH','CN']; // 空数组表示允许所有国家，如需限制可填入国家代码如 ['IR', 'CN']
+const BLOCKED_COUNTRIES = []; // 禁止的国家代码列表
 const ALLOWED_USER_AGENTS = /telegram|bot|curl|postman|httpie|axios|fetch/i;
 const BLOCKED_USER_AGENTS = /scanner|crawler|spider|bot.*attack|sqlmap|nikto|nmap/i;
 
@@ -125,11 +125,11 @@ function handleRootRequest(request) {
   const apiUrl = workerUrl + '/bot';
   
   const html = `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram API Proxy - Status Dashboard</title>
+    <title>Telegram API 代理 - 状态面板</title>
     <style>
         * {
             margin: 0;
@@ -358,9 +358,9 @@ function handleRootRequest(request) {
         <div class="header">
             <div class="status-badge">
                 <span class="status-light"></span>
-                <span class="status-text">API فعال و آماده</span>
+                <span class="status-text">API 运行正常</span>
             </div>
-            <h1>Telegram API Proxy</h1>
+            <h1>Telegram API 代理</h1>
         </div>
         
         <div class="card">
@@ -368,11 +368,11 @@ function handleRootRequest(request) {
                 <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                 </svg>
-                آدرس API
+                API 地址
             </div>
             <div class="url-container">
                 <span class="url-text" id="apiUrl">${apiUrl}</span>
-                <button class="copy-btn" onclick="copyToClipboard()">کپی</button>
+                <button class="copy-btn" onclick="copyToClipboard()">复制</button>
             </div>
         </div>
         
@@ -381,17 +381,17 @@ function handleRootRequest(request) {
                 <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                 </svg>
-                وضعیت اتصال
+                连接状态
             </div>
             <button class="test-btn" onclick="testAPI()">
-                <span id="testBtnText">تست اتصال API</span>
+                <span id="testBtnText">测试 API 连接</span>
             </button>
             <div class="test-result" id="testResult"></div>
         </div>
         
         <div class="footer">
-            <p>Powered by Cloudflare Workers</p>
-            <p style="margin-top: 10px;">Designed by: <strong>Anonymous</strong></p>
+            <p>由 Cloudflare Workers 驱动</p>
+            <p style="margin-top: 10px;">设计者：<strong>Anonymous</strong></p>
         </div>
     </div>
     
@@ -402,7 +402,7 @@ function handleRootRequest(request) {
             
             navigator.clipboard.writeText(text).then(() => {
                 const originalText = btn.textContent;
-                btn.textContent = 'کپی شد';
+                btn.textContent = '已复制';
                 btn.classList.add('copied');
                 
                 setTimeout(() => {
@@ -416,7 +416,7 @@ function handleRootRequest(request) {
             const btn = document.getElementById('testBtnText');
             const result = document.getElementById('testResult');
             
-            btn.innerHTML = '<span class="loading"></span> در حال تست...';
+            btn.innerHTML = '<span class="loading"></span> 正在测试...';
             result.style.display = 'none';
             
             try {
@@ -427,17 +427,17 @@ function handleRootRequest(request) {
                 
                 if (data.ok) {
                     result.className = 'test-result success';
-                    result.innerHTML = 'اتصال موفق - پینگ: ' + latency + 'ms' + ' (میانگین API: ' + data.avgLatency + 'ms)';
+                    result.innerHTML = '连接成功 - 延迟: ' + latency + 'ms' + ' (平均 API 延迟: ' + data.avgLatency + 'ms)';
                 } else {
                     throw new Error('Test failed');
                 }
             } catch (error) {
                 result.className = 'test-result error';
-                result.innerHTML = 'خطا در اتصال به API';
+                result.innerHTML = '连接 API 时出错';
             }
             
             result.style.display = 'block';
-            btn.textContent = 'تست اتصال API';
+            btn.textContent = '测试 API 连接';
         }
         
         document.querySelectorAll('.card').forEach((card, index) => {
@@ -486,7 +486,10 @@ async function handleRequest(request) {
     return handleCorsPreflightRequest();
   }
 
-  if (URL_PATH_REGEX.test(pathname)) {
+  // 支持 /api/bot... 和 /bot... 两种路径格式
+  const normalizedPath = pathname.startsWith('/api') ? pathname.replace('/api', '') : pathname;
+  
+  if (URL_PATH_REGEX.test(normalizedPath)) {
     const startTime = Date.now();
     try {
         await cleanupExpiredData();
@@ -655,7 +658,8 @@ async function recordSuspiciousActivity(ip, type) {
 
 async function parseRequest(request) {
     const url = new URL(request.url);
-    const path = url.pathname;
+    // 支持 /api/bot... 和 /bot... 两种路径格式
+    const path = url.pathname.startsWith('/api') ? url.pathname.replace('/api', '') : url.pathname;
     const clientIP = getClientIP(request);
     
     if (!URL_PATH_REGEX.test(path)) {

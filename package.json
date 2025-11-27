@@ -1,0 +1,29 @@
+{
+  "name": "telegram-api-proxy",
+  "version": "6.0.0",
+  "description": "A Cloudflare-based solution for accessing the Telegram API without VPN in regions where it's restricted",
+  "main": "manual-worker/worker.js",
+  "scripts": {
+    "deploy:pages": "wrangler pages deploy . --project-name=telegram-api-proxy",
+    "deploy:worker": "wrangler deploy",
+    "dev:worker": "wrangler dev",
+    "dev:pages": "wrangler pages dev ."
+  },
+  "keywords": [
+    "telegram",
+    "api",
+    "proxy",
+    "cloudflare",
+    "workers",
+    "pages"
+  ],
+  "author": "Anonymous",
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

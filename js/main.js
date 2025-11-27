@@ -7,11 +7,11 @@ function copyToClipboard() {
     const button = document.querySelector('.copy-button');
     
     navigator.clipboard.writeText(url).then(() => {
-        button.textContent = 'Copied!';
+        button.textContent = '已复制！';
         button.classList.add('copied');
         
         setTimeout(() => {
-            button.textContent = 'Copy URL';
+            button.textContent = '复制 URL';
             button.classList.remove('copied');
         }, 2000);
     });
