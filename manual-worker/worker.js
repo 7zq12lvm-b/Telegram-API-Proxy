@@ -37,8 +37,8 @@ const SUSPICIOUS_THRESHOLD = 10;
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
 const MAX_BODY_SIZE = 50 * 1024 * 1024;
-const ALLOWED_COUNTRIES = ['IR'];
-const BLOCKED_COUNTRIES = [];
+const ALLOWED_COUNTRIES = ['CN']; // 空数组表示允许所有国家，如需限制可填入国家代码如 ['IR', 'CN']
+const BLOCKED_COUNTRIES = []; // 禁止的国家代码列表
 const ALLOWED_USER_AGENTS = /telegram|bot|curl|postman|httpie|axios|fetch/i;
 const BLOCKED_USER_AGENTS = /scanner|crawler|spider|bot.*attack|sqlmap|nikto|nmap/i;
 

@@ -65,6 +65,26 @@ You can access the web interface at:
 
 [https://telegram-api-proxy-anonymous.pages.dev/](https://telegram-api-proxy-anonymous.pages.dev/)
 
+## Deployment
+
+想要自己部署到 Cloudflare？查看详细的部署指南：
+
+- **[中文部署指南](DEPLOY.md)** - 包含 Cloudflare Pages 和 Workers 两种部署方式的详细说明
+
+### Quick Start
+
+1. **使用 Cloudflare Pages（推荐）**：
+   - 将代码推送到 GitHub/GitLab
+   - 在 Cloudflare Dashboard 中连接仓库并部署
+   - 详细步骤见 [DEPLOY.md](DEPLOY.md)
+
+2. **使用 Cloudflare Workers**：
+   ```bash
+   npm install -g wrangler
+   wrangler login
+   wrangler deploy
+   ```
+
 ## License
 
 This project is licensed under the [GPL-3.0](LICENSE) License.
