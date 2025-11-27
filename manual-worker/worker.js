@@ -526,7 +526,10 @@ async function handleRequest(request) {
 
         const response = await proxyToTelegramWithRetry(request, requestInfo);
         
-        updateCircuitBreaker(requestInfo.clientIP, response.ok);
+        // Only count 5xx errors as failures for circuit breaker
+        // 4xx errors (client errors) and 2xx/3xx (success) should not trigger circuit breaker
+        const isServerError = response.status >= 500;
+        updateCircuitBreaker(requestInfo.clientIP, !isServerError);
         updateStats(startTime, response.ok);
 
         return response;
@@ -534,7 +537,14 @@ async function handleRequest(request) {
     } catch (error) {
         console.error('Proxy error:', error);
         stats.failedRequests++;
-        updateCircuitBreaker(getClientIP(request), false);
+        // Only update circuit breaker for network/server errors, not proxy internal errors
+        // Check if it's a timeout or network error that should trigger circuit breaker
+        const isNetworkError = error.name === 'AbortError' || 
+                              error.message.includes('timeout') || 
+                              error.message.includes('Server error');
+        if (isNetworkError) {
+            updateCircuitBreaker(getClientIP(request), false);
+        }
         return handleProxyError(error);
     }
   }
@@ -866,6 +876,24 @@ async function validateBotTokenAdvanced(token) {
 async function proxyToTelegramWithRetry(request, requestInfo) {
     let lastError;
     
+    // Read request body once before retries to avoid "body already consumed" errors
+    let cachedBody = null;
+    let cachedContentType = request.headers.get('content-type') || '';
+    
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+        try {
+            if (cachedContentType.includes('multipart/form-data') || FILE_UPLOAD_METHODS.has(requestInfo.apiMethod)) {
+                cachedBody = await request.formData();
+            } else {
+                cachedBody = await request.arrayBuffer();
+            }
+        } catch (error) {
+            // If body reading fails, it might be empty or already consumed
+            // Continue with null body - will be handled in proxyToTelegram
+            cachedBody = null;
+        }
+    }
+    
     for (let attempt = 0; attempt <= RETRY_CONFIG.MAX_RETRIES; attempt++) {
         try {
             if (attempt > 0) {
@@ -877,7 +905,7 @@ async function proxyToTelegramWithRetry(request, requestInfo) {
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
             
-            const response = await proxyToTelegram(request, requestInfo, attempt);
+            const response = await proxyToTelegram(request, requestInfo, attempt, cachedBody, cachedContentType);
             
             if (response.ok || response.status < 500) {
                 return response;
@@ -901,7 +929,7 @@ async function proxyToTelegramWithRetry(request, requestInfo) {
     throw lastError || new Error('Max retries exceeded');
 }
 
-async function proxyToTelegram(request, requestInfo, attempt = 0) {
+async function proxyToTelegram(request, requestInfo, attempt = 0, cachedBody = null, cachedContentType = '') {
     const { apiMethod, path } = requestInfo;
     
     const endpointIndex = attempt % TELEGRAM_ENDPOINTS.length;
@@ -920,25 +948,41 @@ async function proxyToTelegram(request, requestInfo, attempt = 0) {
     requestHeaders.set('Cache-Control', 'no-cache');
     requestHeaders.set('X-Forwarded-Proto', 'https');
     
-    let requestBody;
-    let contentType = request.headers.get('content-type') || '';
+    let requestBody = null;
+    let contentType = cachedContentType || request.headers.get('content-type') || '';
     
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-        try {
-            if (contentType.includes('multipart/form-data') || FILE_UPLOAD_METHODS.has(apiMethod)) {
-                const formData = await request.formData();
-                requestBody = formData;
+        if (cachedBody !== null) {
+            // Use cached body from first read
+            requestBody = cachedBody;
+            if (cachedContentType.includes('multipart/form-data') || FILE_UPLOAD_METHODS.has(apiMethod)) {
                 requestHeaders.delete('content-type');
             } else {
-                requestBody = await request.arrayBuffer();
                 if (request.method === 'POST' && !contentType) {
                     requestHeaders.set('Content-Type', 'application/json');
                 } else if (contentType) {
                     requestHeaders.set('Content-Type', contentType);
                 }
             }
-        } catch (error) {
-            throw new Error('Failed to read request body');
+        } else {
+            // Fallback: try to read body if not cached (shouldn't happen in normal flow)
+            try {
+                if (contentType.includes('multipart/form-data') || FILE_UPLOAD_METHODS.has(apiMethod)) {
+                    requestBody = await request.formData();
+                    requestHeaders.delete('content-type');
+                } else {
+                    requestBody = await request.arrayBuffer();
+                    if (request.method === 'POST' && !contentType) {
+                        requestHeaders.set('Content-Type', 'application/json');
+                    } else if (contentType) {
+                        requestHeaders.set('Content-Type', contentType);
+                    }
+                }
+            } catch (error) {
+                // If body is empty or already consumed, continue with null body
+                // Some requests (like GET with query params) don't need a body
+                requestBody = null;
+            }
         }
     }
     
