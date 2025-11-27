@@ -1,7 +1,7 @@
 # Cloudflare Workers 配置文件示例
 # 复制此文件为 wrangler.toml 并根据需要修改
 
-name = "telegram-api-proxy"
+name = "tgproxy"
 main = "manual-worker/worker.js"
 compatibility_date = "2024-01-01"
 
